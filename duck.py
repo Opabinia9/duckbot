@@ -1,11 +1,12 @@
 """duck-bot for Holberton codewars server."""
 
-import discord
-from discord.ext import commands
+import datetime
+import pytz
 import json
 from pathlib import Path
-
-from discord.utils import utcnow
+import discord
+from discord.ext import commands
+import requests
 
 intents = discord.Intents.default()
 intents.members = True
@@ -14,13 +15,37 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 
+# HELPERS SECTION
 def load_config(config_file: str) -> dict:
     """"""
     with open(config_file, "r") as conf:
         return json.load(conf)
 
 
-def config_update(
+global config
+config: dict = load_config("config.json")
+
+
+def load_mapping() -> dict:
+    """Load existing mapping or create empty one.
+
+    Returns:
+        dictionry of users discord and codewars usernames.
+
+    """
+    if Path(config["clan_list"]).exists():
+        with open(config["clan_list"], "r") as file:
+            return json.load(file)
+    return {}
+
+
+def save_mapping(data: dict) -> None:
+    """Save mapping to file."""
+    with open(config["clan_list"], "w") as f:
+        json.dump(data, f, indent=2)
+
+
+def save_config(
     config_file: str, key: str, value: str | bool | list | dict
 ) -> dict:
     """"""
@@ -31,13 +56,69 @@ def config_update(
     return config
 
 
-global congig
-config = load_config("config.json")
-dailykata = config["dailykata"]
-bots = config["bots"]
-clan_list = config["clan_list"]
-BOTTOKEN = config["BOTTOKEN"]
-daily_challenge = config["daily_challenge"]
+def fetch_kata(kata_id: str) -> dict[str, str]:
+    """Fetch name of kata and return dict of name and id."""
+    kata = requests.get(
+        f"https://www.codewars.com/api/v1/code-challenges/{kata_id}",
+        timeout=500,
+    ).json()
+    return {"kata_name": kata["name"], "kata_id": kata_id}
+
+
+def load_katalog() -> dict:
+    """"""
+    with open(config["kata_log"], "r") as log_file:
+        kata_log = json.load(log_file)
+    if kata_log is None:
+        raise TypeError("kata_log is None")
+    return kata_log
+
+
+def save_katalog(
+    config: dict, date: str, kata_id: str
+) -> dict[str, dict[str, str]]:
+    """"""
+    kata_log = load_katalog()
+    kata = fetch_kata(kata_id)
+    kata_log[str(date)] = {"kata_id": kata["id"], "kata_name": kata["name"]}
+
+    with open(config["kata_log"], "w") as log_file:
+        json.dump(kata_log, log_file)
+
+    return kata_log
+
+
+def check_stats(dailykata: str) -> dict[str, dict]:
+    """"""
+    api: str = (
+        "https://www.codewars.com/api/v1/users/{}/code-challenges/completed"
+    )
+    clanfile: str = "clan_list.json"
+    with open(clanfile) as file:
+        clan: dict[str, dict] = json.load(file)
+
+    for member in clan.values():
+        response = requests.get(
+            api.format(member["codewars_username"]), timeout=50
+        )
+        member["response"] = response.json()
+
+    for member in clan.values():
+        try:
+            for kata in member["response"]["data"]:
+                if kata["id"] == dailykata:
+                    member["completed"] = True
+                    member["languages"] = kata["completedLanguages"]
+                    del member["response"]
+                    break
+            else:
+                member["completed"] = False
+                del member["response"]
+        except:
+            print(member.items())
+            print()
+            exit(-1)
+    return clan
 
 
 def langtoemote(langs: list) -> str:
@@ -50,25 +131,30 @@ def langtoemote(langs: list) -> str:
         else:
             newlangs.append(str("`" + lang + "`"))
     return ", ".join(newlangs)
-    # <:oh_i_c:1532006641296212111>
+
+
+def get_date() -> datetime.date:
+    """"""
+    timezone = pytz.timezone("Australia/Melbourne")
+    return datetime.datetime.now(timezone).date()
 
 
 @bot.command()
 async def set_kata(ctx: commands.context.Context, kata_url: str) -> None:
     """"""
-    global config
-
+    date = get_date()
     kata_id = kata_url.split("/")[-1]
-    config = config_update(config["config_file"], "dailykata", kata_id)
-    date = utcnow().date()
+    kata_log = save_katalog(config, str(date), kata_id)
 
     if ctx.guild is None:
         raise TypeError("Guild Not Found")
-    challenge_channel = await ctx.guild.fetch_channel(daily_challenge)
+    challenge_channel = await ctx.guild.fetch_channel(
+        config["challenge_channel"]
+    )
     try:
-        await challenge_channel.send(
+        await challenge_channel.send(  # type: ignore
             f"@here the kata for {date} will be: "
-            + f"{'https://www.codewars.com/kata/' + config['dailykata']}"
+            + f"{'https://www.codewars.com/kata/' + kata_log[str(date)]['id']}"
         )
     except BaseException as e:
         print(f"Could not post to {challenge_channel}")
@@ -103,7 +189,7 @@ async def get_unregistered(ctx: commands.context.Context) -> None:
     unregistered = []
     for guild in bot.guilds:
         for member in guild.members:
-            if member.name in bots:
+            if member.name in config["bots"]:
                 continue
             if str(member.id) not in mapping.keys():
                 unregistered.append(member.name)
@@ -140,7 +226,7 @@ async def member_status(ctx: commands.context.Context) -> None:
     list_text = "**Members Registration Status:**\n"
     for guild in bot.guilds:
         for member in guild.members:
-            if member.name in bots:
+            if member.name in config["bots"]:
                 continue
             if str(member.id) in mapping.keys():
                 codewars_username = mapping[str(member.id)][
@@ -148,7 +234,7 @@ async def member_status(ctx: commands.context.Context) -> None:
                 ]
                 list_text += f"{member.name} → {codewars_username}\n"
             else:
-                list_text += f"{member.name} → :x:\n"
+                list_text += f"{member.display_name} → :x:\n"
     await ctx.send(list_text)
 
 
@@ -173,10 +259,10 @@ async def register(
 @bot.command()
 async def stats_daily(ctx: commands.context.Context) -> None:
     """Daily stats for task completion."""
-    from codewarschecker import check_stats
-
-    clan = check_stats(dailykata)
-    clanstats = ""
+    date = str(get_date())
+    kata_log = load_katalog()
+    clan = check_stats(kata_log[date]["id"])
+    clanstats = f"Results for {date}: **{kata_log[date]['name']}**\n"
     for disc_id, member in clan.items():
         stats: str = ""
         stats += f"<@{disc_id}>:\n"
@@ -200,29 +286,82 @@ async def stats_daily(ctx: commands.context.Context) -> None:
     await ctx.send(clanstats)
 
 
-def load_mapping() -> dict:
-    """Load existing mapping or create empty one.
+@bot.command()
+async def stats_yesterday(ctx: commands.context.Context) -> None:
+    """Daily stats for task completion."""
+    from codewarschecker import check_stats
 
-    Returns:
-        dictionry of users discord and codewars usernames.
+    date = str(get_date() - datetime.timedelta(days=1))
+    kata_log = load_katalog()
+    clan = check_stats(kata_log[date]["id"])
+    clanstats = (
+        f"@here\nResults for yesterday!!!: **{kata_log[date]['name']}**\n"
+    )
+    for disc_id, member in clan.items():
+        stats: str = ""
+        stats += f"<@{disc_id}>:\n"
+        stats += (
+            "\t"
+            + "**codewars_username**:    "
+            + str(member["codewars_username"])
+            + "\n"
+        )
+        stats += (
+            "\t"
+            + "**completed**:                        "
+            + str(":white_check_mark:" if member["completed"] else ":x:")
+            + "\n"
+        )
+        if member["completed"]:
+            stats += "\t" + "**languages**:                         "
+            stats += langtoemote(member["languages"])
+            stats += "\n"
+        clanstats += "\n" + stats
+    if ctx.guild is None:
+        raise TypeError("Guild Not Found")
+    challenge_channel = await ctx.guild.fetch_channel(config["stats_channel"])
+    try:
+        await challenge_channel.send(clanstats)  # type: ignore
+    except BaseException as e:
+        print(f"Could not post to {config['stats_channel']}")
+        raise e
 
-    """
-    if Path(clan_list).exists():
-        with open(clan_list, "r") as file:
-            return json.load(file)
-    return {}
 
+@bot.command()
+async def stats_on(ctx: commands.context.Context, date: str) -> None:
+    """Daily stats for task completion."""
+    from codewarschecker import check_stats
 
-def save_mapping(data: dict) -> None:
-    """Save mapping to file."""
-    with open(clan_list, "w") as f:
-        json.dump(data, f, indent=2)
+    kata_log = load_katalog()
+    clan = check_stats(kata_log[date]["id"])
+    clanstats = f"Results for {date}: **{kata_log[date]['name']}**\n"
+    for disc_id, member in clan.items():
+        stats: str = ""
+        stats += f"<@{disc_id}>:\n"
+        stats += (
+            "\t"
+            + "**codewars_username**:    "
+            + str(member["codewars_username"])
+            + "\n"
+        )
+        stats += (
+            "\t"
+            + "**completed**:                        "
+            + str(":white_check_mark:" if member["completed"] else ":x:")
+            + "\n"
+        )
+        if member["completed"]:
+            stats += "\t" + "**languages**:                         "
+            stats += langtoemote(member["languages"])
+            stats += "\n"
+        clanstats += "\n" + stats
+    await ctx.send(clanstats)
 
 
 @bot.event
-async def on_ready():
+async def on_ready() -> None:
     """"""
     print(f"Bot is ready as {bot.user}")
 
 
-bot.run(BOTTOKEN)
+bot.run(config["BOTTOKEN"])
