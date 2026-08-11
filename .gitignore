@@ -1,4 +1,4 @@
-sandbox/
+config/
 __pycache__
 .env
 .venv
