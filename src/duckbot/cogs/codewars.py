@@ -33,6 +33,15 @@ class Codewars(commands.Cog):
         self.config: dict = load_config(self.config_file)
         self.daily_results.start()
         self.next_level_poll.start()
+        self.weekdays = {
+            0: "Monday",
+            1: "Tuesday",
+            2: "Wednesday",
+            3: "Thursday",
+            4: "Friday",
+            5: "Saturday",
+            6: "Sunday",
+        }
 
     @commands.command()
     async def set_kata(
@@ -401,10 +410,13 @@ class Codewars(commands.Cog):
         """"""
         date = get_date(self.config["timezone"])
         tommorow = date + datetime.timedelta(days=1)
+
         p = discord.Poll(
-            question=f"Challenge level for {tommorow}",
+            question="Challenge level for "
+            + f"{self.weekdays[tommorow.weekday()]} {tommorow}",
             duration=datetime.timedelta(hours=23.0, minutes=55),
         )
+
         for kyu, emote in self.config["emotes"].items():
             if "kyu" in kyu:
                 p.add_answer(text=kyu, emoji=emote)
@@ -412,12 +424,13 @@ class Codewars(commands.Cog):
         guild = self.bot.guilds[0]
         if guild is None:
             return
+
         challenge_channel = await guild.fetch_channel(
             self.config["next_level_channel"]
         )
+
         try:
-            await challenge_channel.send("<@here>")  # type: ignore
-            await challenge_channel.send(poll=p)  # type: ignore
+            await challenge_channel.send("<@here>", poll=p)  # type: ignore
         except BaseException as e:
             print(f"Could not post to {self.config['next_level_channel']}")
             raise e
