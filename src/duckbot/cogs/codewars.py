@@ -375,6 +375,7 @@ class Codewars(commands.Cog):
             "# Clan leaderboard:\n"
             + f"{'# #.':<10}"
             + f"{'Rank':>11}"
+            + f"{'Score':>14}"
             + f"{'Honor':>14}"
             + f"{'User':>18}"
             + "\n"
@@ -383,11 +384,12 @@ class Codewars(commands.Cog):
         )
         for pos, member in enumerate(clan_orderd):
             rank = "".join(strtoemote(self.config["emotes"], [member["rank"]]))
-            scoreboard = str(
+            scoreboard += str(
                 f"# {pos:<16}"
-                + f"{f'{rank:>6}':>13}      "
-                + f"{f'{member["honour"]:>10}':<26}"
-                + f"{f' <@{member["discord_id"]}>':<32}"
+                + f"{f'{rank}'}"
+                + f"{f'{str(member["total_score"]).zfill(3):>16}'}"
+                + f"{f'{str(member["honour"]).zfill(3):>16}':<35}"
+                + f"{f' <@{member["discord_id"]}>'}"
                 + "\n"
             )
             if pos == 9:
