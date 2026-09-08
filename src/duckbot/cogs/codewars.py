@@ -3,8 +3,8 @@
 import datetime
 from zoneinfo import ZoneInfo
 import requests
-import json
 import discord
+from discord import app_commands
 from discord.ext import commands, tasks
 from pprint import pprint
 from duckbot.helpers import (
@@ -327,12 +327,15 @@ class Codewars(commands.Cog):
             clanstats += "\n" + stats
         await ctx.send(clanstats)
 
-    @commands.command()
-    async def leaderboard(self, ctx: commands.context.Context) -> None:
+    @app_commands.command(name="leaderboard", description="U")
+    async def leaderboard(
+        self, interaction: discord.interactions.Interaction
+    ) -> None:
         """"""
         print("Command: leaderboard")
         clan = load_clan(self.config)
 
+        await interaction.response.defer()
         for member in clan.values():
             response = requests.get(
                 self.config["user_api"].format(member["codewars_username"]),
@@ -378,7 +381,6 @@ class Codewars(commands.Cog):
             + ("-" * 89)
             + "\n"
         )
-        await ctx.send(scoreboard)
         for pos, member in enumerate(clan_orderd):
             rank = "".join(strtoemote(self.config["emotes"], [member["rank"]]))
             scoreboard = str(
@@ -388,9 +390,9 @@ class Codewars(commands.Cog):
                 + f"{f' <@{member["discord_id"]}>':<32}"
                 + "\n"
             )
-            await ctx.send(scoreboard)
-            if pos == 10:
+            if pos == 9:
                 break
+        await interaction.followup.send(scoreboard)
 
     @tasks.loop(time=next_level_time)
     async def next_level_poll(self) -> None:
