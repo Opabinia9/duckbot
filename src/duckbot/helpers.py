@@ -6,6 +6,15 @@ import requests
 from zoneinfo import ZoneInfo
 from pathlib import Path
 from pprint import pprint
+from discord.ext import commands
+
+
+async def log_error(bot: commands.bot.Bot, message: str) -> None:
+    try:
+        botinfo = await bot.application_info()
+        await botinfo.owner.send(message)
+    except BaseException as e:
+        raise e
 
 
 def load_config(config_file: str) -> dict:

@@ -16,6 +16,7 @@ from duckbot.helpers import (
     save_katalog,
     check_stats,
     strtoemote,
+    log_error,
 )
 
 
@@ -74,7 +75,9 @@ class Codewars(commands.Cog):
             )
             await message.create_thread(name=f"{date} {kata['kata_name']}")
         except BaseException as e:
-            print(f"Could not post to {challenge_channel}")
+            err_msg = f"Could not post to {challenge_channel}"
+            print(err_msg)
+            await log_error(self.bot, f"error: {err_msg}")
             raise e
 
     @commands.command()
@@ -106,7 +109,9 @@ class Codewars(commands.Cog):
                         + "(PS. don't include the <> around your username)"
                     )
                 except BaseException as err:
-                    print(f"Could not DM {member.name}")
+                    err_msg = f"Could not DM {member.name}"
+                    print(err_msg)
+                    await log_error(self.bot, f"error: {err_msg}")
                     raise err
 
         list_text = "**Unregistered Members:**\n"
@@ -235,7 +240,9 @@ class Codewars(commands.Cog):
         try:
             await challenge_channel.send(clanstats)  # type: ignore
         except BaseException as e:
-            print(f"Could not post to {self.config['stats_channel']}")
+            err_msg = f"Could not post to {self.config['stats_channel']}"
+            print(err_msg)
+            await log_error(self.bot, f"error: {err_msg}")
             raise e
 
     @tasks.loop(time=results_time)
@@ -271,8 +278,11 @@ class Codewars(commands.Cog):
         try:
             await challenge_channel.send(clanstats)  # type: ignore
         except BaseException as e:
-            print(f"Could not post to {self.config['stats_channel']}")
+            err_msg = f"Could not post to {self.config['stats_channel']}"
+            print(err_msg)
+            await log_error(self.bot, f"error: {err_msg}")
             raise e
+        print("Command: daily_results, status: finished")
 
     @daily_results.before_loop
     async def before_daily_results(self) -> None:
@@ -341,10 +351,14 @@ class Codewars(commands.Cog):
                 )
                 del member["response"]
             except BaseException as err:
-                print("==========member.items=====================")
-                pprint(member)
-                print("===========================================")
-                print()
+                err_msg = (
+                    "==========member.items=====================\n"
+                    + f"{member}\n"
+                    + "===========================================\n"
+                    + "\n"
+                )
+                print(err_msg)
+                await log_error(self.bot, f"error: {err_msg}")
                 raise err
         # try:
         #     with open("config/leaderboard.json", "w") as file:
@@ -355,10 +369,14 @@ class Codewars(commands.Cog):
         try:
             clan_orderd.sort(key=lambda x: x["total_score"], reverse=True)
         except KeyError as err:
-            print("=========================")
-            print("failed to sort clanlist in leaderboad")
-            pprint(clan_orderd)
-            print("=========================")
+            err_msg = (
+                "=========================\n"
+                + "failed to sort clanlist in leaderboad\n"
+                + f"{clan_orderd}"
+                + "=========================\n"
+            )
+            print(err_msg)
+            await log_error(self.bot, f"error: {err_msg}")
             raise err
         scoreboard: str = str(
             "# Clan leaderboard:\n"
@@ -412,7 +430,9 @@ class Codewars(commands.Cog):
         try:
             await challenge_channel.send("<@here>", poll=p)  # type: ignore
         except BaseException as e:
-            print(f"Could not post to {self.config['next_level_channel']}")
+            err_msg = f"Could not post to {self.config['next_level_channel']}"
+            print(err_msg)
+            await log_error(self.bot, f"error: {err_msg}")
             raise e
 
     @next_level_poll.before_loop
