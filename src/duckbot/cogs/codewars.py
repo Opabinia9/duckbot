@@ -181,24 +181,17 @@ class Codewars(commands.Cog):
         else:
             await ctx.send(f"Error: kata for {date} unset")
             return
-        clanstats = f"Results for {date}: **{kata_log[date]['kata_name']}**\n"
+        clanstats = f"Results for {date}: **{kata_log[date]['kata_name']}**"
         for disc_id, member in clan.items():
-            stats: str = (
-                f"<@{disc_id}>:\n"
-                + "\t**codewars_username**:    "
-                + str(member["codewars_username"])
-                + "\n\t**completed**:                        "
-                + str(":white_check_mark:" if member["completed"] else ":x:")
-                + "\n"
-            )
+            stats: str = f"<@{disc_id}>: "
             if member["completed"]:
                 stats += str(
-                    "\t**languages**:                         "
-                    + "".join(
+                    ", ".join(
                         strtoemote(self.config["emotes"], member["languages"])
                     )
-                    + "\n"
                 )
+            else:
+                stats += ":x:"
             clanstats += "\n" + stats
         await ctx.send(clanstats)
 
@@ -256,25 +249,18 @@ class Codewars(commands.Cog):
         clan = check_stats(self.config, kata_log[date]["kata_id"])
         clanstats = (
             "@here\nResults for yesterday!!!: "
-            + f"**{kata_log[date]['kata_name']}**\n"
+            + f"**{kata_log[date]['kata_name']}**"
         )
         for disc_id, member in clan.items():
-            stats: str = (
-                f"<@{disc_id}>:\n"
-                + "\t**codewars_username**:    "
-                + str(member["codewars_username"])
-                + "\n\t**completed**:                        "
-                + str(":white_check_mark:" if member["completed"] else ":x:")
-                + "\n"
-            )
+            stats: str = f"<@{disc_id}>: "
             if member["completed"]:
                 stats += str(
-                    "\t**languages**:                         "
-                    + ", ".join(
+                    ", ".join(
                         strtoemote(self.config["emotes"], member["languages"])
                     )
-                    + "\n"
                 )
+            else:
+                stats += ":x:"
             clanstats += "\n" + stats
 
         guild = self.bot.guilds[0]
@@ -310,29 +296,23 @@ class Codewars(commands.Cog):
         """Daily stats for task completion."""
         print("Command: stats_on")
         kata_log = load_katalog(self.config)
+
         if date in kata_log.keys():
             clan = check_stats(self.config, kata_log[date]["kata_id"])
         else:
             await ctx.send(f"Error: kata for {date} unset")
             return
-        clanstats = f"Results for {date}: **{kata_log[date]['kata_name']}**\n"
+        clanstats = f"Results for {date}: **{kata_log[date]['kata_name']}**"
         for disc_id, member in clan.items():
-            stats: str = (
-                f"<@{disc_id}>:\n"
-                + "\t**codewars_username**:    "
-                + str(member["codewars_username"])
-                + "\n\t**completed**:                        "
-                + str(":white_check_mark:" if member["completed"] else ":x:")
-                + "\n"
-            )
+            stats: str = f"<@{disc_id}>: "
             if member["completed"]:
                 stats += str(
-                    "\t**languages**:                         "
-                    + ", ".join(
+                    ", ".join(
                         strtoemote(self.config["emotes"], member["languages"])
                     )
-                    + "\n"
                 )
+            else:
+                stats += ":x:"
             clanstats += "\n" + stats
         await ctx.send(clanstats)
 
